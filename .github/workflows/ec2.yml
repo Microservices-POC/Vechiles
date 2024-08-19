@@ -54,6 +54,8 @@ jobs:
       - name: Stop and Kill Existing Process
         run: |
           ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          #Stop the Service
+          sudo systemctl stop vehicles.service
           # Check for any running instance and kill it
           PID=$(lsof -t -i:5000)
           if [ -n "$PID" ]; then
@@ -68,8 +70,6 @@ jobs:
           rm -rf /home/ubuntu/vehicles
           # Unzip the deployment package
           unzip -o /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/      
-          # Reload systemd to recognize any changes
-          sudo systemctl daemon-reload
           # Restart the service
-          sudo systemctl restart vehicles.service
+          sudo systemctl start vehicles.service
           EOF
