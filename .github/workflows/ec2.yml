@@ -1,4 +1,4 @@
-name: Deploy Vehicles Service to EC2
+name: Deploy to EC2
 
 on:
   push:
@@ -11,12 +11,12 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v2
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.101'
+          dotnet-version: '8.0.x'
 
       - name: Restore dependencies
         run: dotnet restore ./Vehicles.csproj
@@ -33,38 +33,23 @@ jobs:
           zip -r ../../Vehicles-deployment.zip *
 
       - name: Deploy to EC2
-        env:
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_PUBLIC_IP: ${{ secrets.EC2_PUBLIC_IP }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          # Create a temporary directory to hold the deployment files
-          mkdir -p $HOME/deploy
-          cp Vehicles-deployment.zip $HOME/deploy/
-          
-          # Upload deployment files to the EC2 instance
-          scp -i <(echo "$EC2_SSH_KEY") -o StrictHostKeyChecking=no $HOME/deploy/Vehicles-deployment.zip $EC2_USER@$EC2_PUBLIC_IP:/home/$EC2_USER/
-          
-          # SSH into the EC2 instance and deploy the application
-          ssh -i <(echo "$EC2_SSH_KEY") -o StrictHostKeyChecking=no $EC2_USER@$EC2_PUBLIC_IP << 'EOF'
-            # Navigate to the deployment directory
-            cd /home/$EC2_USER/
-
-            # Unzip the deployment bundle
-            unzip -o Vehicles-deployment.zip -d vehicles
-
-            # Navigate to the deployment directory
-            cd vehicles
-
-            # Stop the currently running application (if any)
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.EC2_PUBLIC_IP }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Stop the old application service
             sudo systemctl stop myapp.service || true
 
             # Remove old files (optional)
             sudo rm -rf /var/www/myapp/*
 
             # Copy new files to the application directory
-            sudo cp -r * /var/www/myapp/
+            sudo cp -r /home/ubuntu/Vehicles-deployment/* /var/www/myapp/
 
             # Start the application
             sudo systemctl start myapp.service
-          EOF
+
+      - name: Clean up
+        run: rm -f Vehicles-deployment.zip
