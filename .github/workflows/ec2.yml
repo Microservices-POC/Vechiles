@@ -45,23 +45,30 @@ jobs:
       with:
         name: dotnet-app
 
+    - name: Install SSH client
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+
+    - name: Prepare deployment package
+      run: |
+        mkdir -p ~/deploy
+        cd ~/deploy
+        # Assuming the artifact is a directory, no need to unzip or untar
+        cp -r ../dotnet-app/* .
+
     - name: Deploy to AWS EC2
       env:
         SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USER: ${{ secrets.EC2_USER }}
       run: |
-        # Install SSH client
-        sudo apt-get update
-        sudo apt-get install -y openssh-client
-
-        # Prepare deployment package
-        mkdir -p ~/deploy
-        cd ~/deploy
-        tar -xzvf dotnet-app.tar.gz
-
-        # SSH into EC2 and deploy
+        # Configure SSH
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        
+        # SSH into EC2 and deploy
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST << 'EOF'
           # Commands to deploy on EC2
           sudo systemctl stop myapp.service
