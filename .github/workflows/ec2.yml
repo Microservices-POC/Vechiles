@@ -1,81 +1,42 @@
-name: Deploy .NET App to AWS EC2
+name: Deploy to EC2
 
 on:
   push:
     branches:
-      - main  # Set the branch you want to deploy from
+      - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Setup .NET
+    - name: Set up .NET Core
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '7.x'  # Specify the .NET version you are using
+        dotnet-version: '8.0.101'
 
-    - name: Install dependencies
-      run: dotnet restore
+    - name: Publish .NET application
+      run: dotnet publish -c Release -o ./publish
 
-    - name: Build
-      run: dotnet build --configuration Release
-
-    - name: Test
-      run: dotnet test --configuration Release
-
-    - name: Publish
-      run: dotnet publish --configuration Release --output ./publish
-
-    - name: Upload artifacts
+    - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: dotnet-app
         path: ./publish
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-    - name: Download artifacts
+    - name: Download artifact
       uses: actions/download-artifact@v3
       with:
         name: dotnet-app
 
-    - name: Install SSH client
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openssh-client
-        ls -al
-
-    - name: Prepare deployment package
-      run: |
-        ls -al
-        mkdir -p ~/deploy
-        cd ~/deploy
-        ls -al
-        # Assuming the artifact is a directory, no need to unzip or untar
-        cp -r ../dotnet-app/* .
-
-    - name: Deploy to AWS EC2
+    - name: Deploy to EC2
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        EC2_USER: ${{ secrets.EC2_USER }}
+        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        EC2_USER: ubuntu
+        EC2_HOST: 18.223.149.26
       run: |
-        # Configure SSH
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        
-        # SSH into EC2 and deploy
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST << 'EOF'
-          # Commands to deploy on EC2
-          sudo systemctl stop myapp.service
-          rm -rf /var/www/myapp/*
-          cp -r ~/deploy/* /var/www/myapp/
-          sudo systemctl start myapp.service
-        EOF
+        scp -i $EC2_SSH_KEY -o StrictHostKeyChecking=no -r ./publish/* $EC2_USER@$EC2_HOST:/var/www/myapp/
+        ssh -i $EC2_SSH_KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'sudo systemctl restart myapp.service'
