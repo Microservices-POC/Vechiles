@@ -51,10 +51,24 @@ jobs:
           aws ec2 describe-instances --region us-east-2 --filters "Name=tag:Name,Values=Vehicles-Instance" --query "Reservations[*].Instances[*].PublicIpAddress" --output text --debug > ec2-ip.txt
           scp -o StrictHostKeyChecking=no -i private_key.pem ./Vehicles-deployment.zip ubuntu@$(cat ec2-ip.txt):/home/ubuntu/
 
-      - name: Deploy on EC2
+      - name: Stop and Kill Existing Process
         run: |
           ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
-          unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/
-          cd /home/ubuntu/vehicles/
-          ./Vehicles &
+          # Check for any running instance and kill it
+          PID=$(lsof -t -i:5000)
+          if [ -n "$PID" ]; then
+            echo "Killing process $PID"
+            kill -9 $PID
+          fi
+          EOF
+
+      - name: Deploy and Start Service on EC2
+        run: |
+          ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          # Unzip the deployment package
+          unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/      
+          # Reload systemd to recognize any changes
+          sudo systemctl daemon-reload
+          # Restart the service
+          sudo systemctl restart vehicles.service
           EOF
