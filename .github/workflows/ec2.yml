@@ -16,7 +16,7 @@ jobs:
     - name: Set up .NET Core
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.101'
+        dotnet-version: '8.0.x' # Adjust this based on the .NET version you're using
 
     - name: Publish .NET application
       run: dotnet publish -c Release -o ./publish
@@ -38,5 +38,7 @@ jobs:
         EC2_USER: ubuntu
         EC2_HOST: 18.223.149.26
       run: |
-        scp -i $EC2_SSH_KEY -o StrictHostKeyChecking=no -r ./publish/* $EC2_USER@$EC2_HOST:/var/www/myapp/
-        ssh -i $EC2_SSH_KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'sudo systemctl restart myapp.service'
+        echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ssh_key
+        chmod 600 /tmp/ssh_key
+        scp -i /tmp/ssh_key -o StrictHostKeyChecking=no -r ./publish/* $EC2_USER@$EC2_HOST:/var/www/myapp/
+        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'sudo systemctl restart myapp.service'
