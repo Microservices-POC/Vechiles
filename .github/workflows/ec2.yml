@@ -3,7 +3,7 @@ name: Deploy Vehicles Service
 on:
   push:
     branches:
-      - dev
+      - main
 
 jobs:
   build:
