@@ -27,7 +27,9 @@ jobs:
         COMMIT_SHA: ${{ github.sha }}
       run: |
         zip -r deploy-package-${COMMIT_SHA}.zip ./publish
-        aws s3 cp deploy-package.zip s3://$S3_BUCKET/deploy-package.zip
+        ls -l deploy-package-${COMMIT_SHA}.zip # Check if the zip file is correctly created
+        aws s3 cp deploy-package-${COMMIT_SHA}.zip s3://$S3_BUCKET/deploy-package-${COMMIT_SHA}.zip
+        aws s3 ls s3://$S3_BUCKET/ # List the S3 bucket to verify upload
 
     - name: Deploy to EC2 via SSH
       env:
