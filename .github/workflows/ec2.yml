@@ -1,78 +1,70 @@
-name: Deploy to EC2
+name: Deploy .NET App to AWS EC2
 
 on:
   push:
     branches:
-      - main
+      - main  # Set the branch you want to deploy from
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '7.x'  # Specify the .NET version you are using
 
-      - name: Restore dependencies
-        run: dotnet restore ./Vehicles.csproj
+    - name: Install dependencies
+      run: dotnet restore
 
-      - name: Build
-        run: dotnet build --configuration Release ./Vehicles.csproj
+    - name: Build
+      run: dotnet build --configuration Release
 
-      - name: Publish
-        run: dotnet publish Vehicles.csproj -c Release -r linux-x64 --self-contained -o ./publish/vehicles
+    - name: Test
+      run: dotnet test --configuration Release
 
-      - name: Package Deployment Bundle
-        run: |
-          cd ./publish/vehicles
-          zip -r ../../Vehicles-deployment.zip *
+    - name: Publish
+      run: dotnet publish --configuration Release --output ./publish
 
-      - name: Debug SSH Connection
-        uses: appleboy/ssh-action@v0.1.8
-        with:
-          host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            echo "Checking SSH Connection..."
-            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.EC2_USER }}@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
-  
-      - name: Upload to EC2
-        uses: appleboy/scp-action@v0.0.8
-        with:
-          host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: Vehicles-deployment.zip
-          target: /home/ubuntu/
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.8
-        with:
-          host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Unzip the deployment bundle
-            cd /home/ubuntu
-            unzip Vehicles-deployment.zip -d Vehicles-deployment
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-            # Stop the old application service
-            sudo systemctl stop myapp.service || true
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dotnet-app
+        path: ./publish
 
-            # Remove old files (optional)
-            sudo rm -rf /var/www/myapp/*
+    - name: Deploy to AWS EC2
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+      run: |
+        # Install SSH client
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
 
-            # Copy new files to the application directory
-            sudo cp -r /home/ubuntu/Vehicles-deployment/* /var/www/myapp/
+        # Download and unzip the artifact
+        mkdir -p ~/deploy
+        cd ~/deploy
+        curl -LOk https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/dotnet-app.zip
+        unzip dotnet-app.zip
 
-            # Start the application
-            sudo systemctl start myapp.service
-
-      - name: Clean up
-        run: rm -f Vehicles-deployment.zip
+        # SSH into EC2 and deploy
+        chmod 600 ~/.ssh/id_rsa
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST << 'EOF'
+          # Commands to deploy on EC2
+          sudo systemctl stop my-dotnet-app.service
+          rm -rf /var/www/myapp/*
+          cp -r ~/deploy/* /var/www/myapp/
+          sudo systemctl start myapp.service
+        EOF
