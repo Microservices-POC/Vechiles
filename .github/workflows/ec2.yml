@@ -37,17 +37,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y awscli
 
+      - name: Add SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+
       - name: Transfer Deployment Package to EC2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           aws ec2 describe-instances --filters "Name=tag:Name,Values=Vehicles-Instance" --query "Reservations[*].Instances[*].PublicIpAddress" --output text > ec2-ip.txt
-          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} ./Vehicles-deployment.zip ubuntu@$(cat ec2-ip.txt):/home/ubuntu/
+          scp -o StrictHostKeyChecking=no -i private_key.pem ./Vehicles-deployment.zip ubuntu@$(cat ec2-ip.txt):/home/ubuntu/
 
       - name: Deploy on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ubuntu@$(cat ec2-ip.txt) << 'EOF'
           unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/
           cd /home/ubuntu/vehicles/
           ./Vehicles &
