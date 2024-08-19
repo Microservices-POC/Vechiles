@@ -43,6 +43,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: 'us-east-2'
         run: |
-          eb use Vehicles-env
-          eb init -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2" --no-verify-ssl
+          eb init -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2" --application-name "Microservices POC" --no-verify-ssl
+          eb use Vehicles-env    
           eb deploy --no-verify-ssl
