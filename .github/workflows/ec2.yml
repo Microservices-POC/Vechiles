@@ -65,8 +65,9 @@ jobs:
       - name: Deploy and Start Service on EC2
         run: |
           ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          rm -rf /home/ubuntu/vehicles
           # Unzip the deployment package
-          unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/      
+          unzip -o /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/      
           # Reload systemd to recognize any changes
           sudo systemctl daemon-reload
           # Restart the service
