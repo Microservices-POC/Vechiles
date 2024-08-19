@@ -37,12 +37,18 @@ jobs:
       - name: Check EB CLI version
         run: eb --version
 
+      - name: Initialize Elastic Beanstalk
+        run: |
+          eb init -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2" --no-verify-ssl
+
+      - name: Set Elastic Beanstalk environment
+        run: |
+          eb use Vehicles-env
+
       - name: Deploy to Elastic Beanstalk
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: 'us-east-2'
         run: |
-          eb use "Microservices POC"
-          eb init -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2" --no-verify-ssl
           eb deploy --no-verify-ssl
