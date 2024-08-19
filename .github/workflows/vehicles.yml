@@ -19,13 +19,13 @@ jobs:
           dotnet-version: '8.0.101'
 
       - name: Restore dependencies
-        run: dotnet restore ../../Vehicles.csproj
+        run: dotnet restore ./Vehicles.csproj
 
       - name: Build
-        run: dotnet build --configuration Release ../../Vehicles.csproj
+        run: dotnet build --configuration Release ./Vehicles.csproj
 
       - name: Publish
-        run: dotnet publish --configuration Release -o ./publish/vehicles ../../Vehicles.csproj
+        run: dotnet publish --configuration Release -o ./publish/vehicles ./Vehicles.csproj
 
       - name: Deploy to Elastic Beanstalk
         env:
