@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to EC2 via SSM
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     - name: Set up .NET Core
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.x' # Adjust this based on the .NET version you're using
+        dotnet-version: '8.0.x' # Specify your .NET version
 
     - name: Publish .NET application
       run: dotnet publish -c Release -o ./publish
@@ -32,13 +32,23 @@ jobs:
       with:
         name: dotnet-app
 
-    - name: Deploy to EC2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2 # Your AWS region
+
+    - name: Deploy to EC2 via SSM
       env:
-        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        EC2_USER: ubuntu
-        EC2_HOST: 18.223.149.26
+        INSTANCE_ID: i-02d57b1882b7e5fe9 # Your EC2 instance ID
+        S3_BUCKET: uzair-microservices-testing # Your S3 bucket name
       run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ssh_key
-        chmod 600 /tmp/ssh_key
-        scp -i /tmp/ssh_key -o StrictHostKeyChecking=no -r ./publish/* $EC2_USER@$EC2_HOST:/var/www/myapp/
-        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'sudo systemctl restart myapp.service'
+        zip -r deploy-package.zip ./publish
+        aws s3 cp deploy-package.zip s3://$S3_BUCKET/deploy-package.zip
+        aws ssm send-command \
+          --instance-ids $INSTANCE_ID \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy .NET app" \
+          --parameters commands="aws s3 cp s3://$S3_BUCKET/deploy-package.zip /tmp/deploy-package.zip, unzip /tmp/deploy-package.zip -d /var/www/myapp/, sudo systemctl restart myapp.service" \
+          --region ${{ secrets.AWS_REGION }}
