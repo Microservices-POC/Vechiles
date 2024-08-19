@@ -26,7 +26,10 @@ jobs:
 
       - name: Publish
         run: dotnet publish -c Release -r linux-x64 --self-contained -o ./publish/vehicles
-
+      - name: Package Deployment Bundle
+        run: |
+            cd ./publish/vehicles
+            zip -r ../../Vehicles-deployment.zip *
       - name: Install AWS Elastic Beanstalk CLI
         run: |
           sudo apt-get update
