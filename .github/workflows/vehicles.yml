@@ -25,7 +25,8 @@ jobs:
         run: dotnet build --configuration Release ./Vehicles.csproj
 
       - name: Publish
-        run: dotnet publish -c Release -r linux-x64 --self-contained -o ./publish/vehicles
+        run: dotnet publish Vehicles.csproj -c Release -r linux-x64 --self-contained -o ./publish/vehicles
+
       - name: Package Deployment Bundle
         run: |
             cd ./publish/vehicles
