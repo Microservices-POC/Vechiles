@@ -55,7 +55,7 @@ jobs:
         env:
           VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
         run: |
-          sshpass -p "${{ secrets.VM_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          sshpass -p "${{ secrets.VM_PASSWORD }}" ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=no ubuntu@$(cat ec2-ip.txt) << 'EOF'
           unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/
           cd /home/ubuntu/vehicles/
           ./Vehicles &
