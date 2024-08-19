@@ -1,46 +1,54 @@
-name: Deploy to EC2 via S3 and SSH
+name: Deploy Vehicles Service
 
 on:
   push:
     branches:
-      - main
+      - dev
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    - name: Set up .NET Core
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.101' # Specify your .NET version
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '8.0.101'
 
-    - name: Publish .NET application
-      run: dotnet publish -c Release -o ./publish
+      - name: Restore dependencies
+        run: dotnet restore ./Vehicles.csproj
 
-    - name: Upload artifact to S3
-      env:
-        S3_BUCKET: uzair-microservices-testing # Your S3 bucket name
-        COMMIT_SHA: ${{ github.sha }}
-      run: |
-        zip -r deploy-package-${COMMIT_SHA}.zip ./publish
-        ls -l deploy-package-${COMMIT_SHA}.zip # Check if the zip file is correctly created
-        aws s3 cp deploy-package-${COMMIT_SHA}.zip s3://$S3_BUCKET/deploy-package-${COMMIT_SHA}.zip
-        aws s3 ls s3://$S3_BUCKET/ # List the S3 bucket to verify upload
+      - name: Build
+        run: dotnet build --configuration Release ./Vehicles.csproj
 
-    - name: Deploy to EC2 via SSH
-      env:
-        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        EC2_USER: ubuntu
-        EC2_HOST: 18.223.149.26
-        S3_BUCKET: uzair-microservices-testing
-        COMMIT_SHA: ${{ github.sha }}
-      run: |
-        echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ssh_key
-        chmod 600 /tmp/ssh_key
-        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "wget https://$S3_BUCKET.s3.us-east-2.amazonaws.com/deploy-package-${COMMIT_SHA}.zip -O /tmp/deploy-package.zip"
-        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "unzip -o /tmp/deploy-package.zip -d /var/www/myapp/"
-        ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "sudo systemctl restart myapp.service"
+      - name: Publish
+        run: dotnet publish Vehicles.csproj -c Release -r linux-x64 --self-contained -o ./publish/vehicles
+
+      - name: Package Deployment Bundle
+        run: |
+          cd ./publish/vehicles
+          zip -r ../../Vehicles-deployment.zip *
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Transfer Deployment Package to EC2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws ec2 describe-instances --filters "Name=tag:Name,Values=Vehicles-Instance" --query "Reservations[*].Instances[*].PublicIpAddress" --output text > ec2-ip.txt
+          scp -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} ./Vehicles-deployment.zip ubuntu@$(cat ec2-ip.txt):/home/ubuntu/
+
+      - name: Deploy on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.EC2_SSH_PRIVATE_KEY }} ubuntu@$(cat ec2-ip.txt) << 'EOF'
+          unzip /home/ubuntu/Vehicles-deployment.zip -d /home/ubuntu/vehicles/
+          cd /home/ubuntu/vehicles/
+          ./Vehicles &
+          EOF
