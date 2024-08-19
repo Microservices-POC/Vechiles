@@ -49,11 +49,14 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y openssh-client
+        ls -al
 
     - name: Prepare deployment package
       run: |
+        ls -al
         mkdir -p ~/deploy
         cd ~/deploy
+        ls -al
         # Assuming the artifact is a directory, no need to unzip or untar
         cp -r ../dotnet-app/* .
 
