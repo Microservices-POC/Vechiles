@@ -29,16 +29,14 @@ jobs:
 
       - name: Package Deployment Bundle
         run: |
-            cd ./publish/vehicles
-            zip -r ../../Vehicles-deployment.zip *
+          cd ./publish/vehicles
+          zip -r ../../Vehicles-deployment.zip *
+
       - name: Install AWS Elastic Beanstalk CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
           pip3 install awsebcli
-
-      - name: Check EB CLI version
-        run: eb --version
 
       - name: Deploy to Elastic Beanstalk
         env:
@@ -46,6 +44,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: 'us-east-2'
         run: |
-          eb init "Microservices POC" -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2"  --no-verify-ssl
-          eb use Vehicles-env    
+          eb init "Microservices POC" -p "64bit Amazon Linux 2023 v3.1.5 running .NET 8" -r "us-east-2" --no-verify-ssl
+          eb use Vehicles-env
           eb deploy --no-verify-ssl
